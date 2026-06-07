@@ -1,0 +1,332 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg:      #F5F0E8;
+  --surface: #EDEAE0;
+  --primary: #1E1C18;
+  --accent:  #C8572A;
+  --text:    #1E1C18;
+  --muted:   #8C8880;
+
+  --font-heading: 'Playfair Display', serif;
+  --font-body:    'DM Sans', sans-serif;
+
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:   16px;
+  --radius-pill: 9999px;
+
+  --shadow-xs: 0 1px 2px 0 rgba(30, 28, 24, 0.05);
+  --shadow-sm: 0 2px 6px 0 rgba(30, 28, 24, 0.08);
+  --shadow-md: 0 4px 16px 0 rgba(30, 28, 24, 0.10);
+  --shadow-lg: 0 8px 32px 0 rgba(30, 28, 24, 0.13);
+  --shadow-xl: 0 16px 48px 0 rgba(30, 28, 24, 0.18);
+
+  --glow: 0 0 32px 0 rgba(200, 87, 42, 0.18);
+  --gradient-hero: linear-gradient(160deg, #F5F0E8 80%, #EDEAE0 100%);
+
+  --space-section: 80px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Responsive nav helpers */
+@media (max-width: 767px) {
+  .hidden-mobile {
+    display: none !important;
+  }
+  .show-mobile {
+    display: flex !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .show-mobile {
+    display: none !important;
+  }
+}
+
+/* Scroll reveal */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Card hover */
+.card-hover {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-md);
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-xl);
+}
+
+/* Image zoom wrapper */
+.img-zoom-wrapper {
+  overflow: hidden;
+}
+
+.img-zoom-wrapper img {
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.img-zoom-wrapper:hover img {
+  transform: scale(1.05);
+}
+
+/* Focus visible */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Selection */
+::selection {
+  background-color: rgba(200, 87, 42, 0.18);
+  color: var(--primary);
+}
+
+/* Section padding */
+section {
+  padding: var(--space-section) 0;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --space-section: 48px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+/* ANIMATION UTILITIES */
+/* ─────────────────────────────────────────────────────────────────── */
+
+/* 1. Scroll reveal classes */
+.reveal {
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.reveal.will-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+}
+
+.reveal.visible {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+/* 2. Toast slide-in animation */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.toast-slide-in {
+  animation: slideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 3. Button hover lift */
+.btn-lift {
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.btn-lift:hover {
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.btn-lift:active {
+  transform: scale(0.98);
+}
+
+.btn-lift:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+/* 4. Card hover scale with layered shadow */
+.card-hover {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06),
+              0 8px 24px rgba(0, 0, 0, 0.08),
+              0 20px 48px rgba(0, 0, 0, 0.06);
+}
+
+/* 5. Shimmer loading skeleton */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+/* 6. Smooth page fade */
+@keyframes pageFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.page-enter {
+  animation: pageFade 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 7. Mobile responsive helpers */
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+
+  .stack-mobile {
+    flex-direction: column !important;
+  }
+
+  .full-mobile {
+    width: 100% !important;
+  }
+
+  .text-center-mobile {
+    text-align: center !important;
+  }
+}
+
+/* 8. Staggered reveal for card grids */
+.reveal-stagger.visible > * {
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.reveal-stagger.will-reveal > * {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.reveal-stagger.visible > *:nth-child(1) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0ms;
+}
+
+.reveal-stagger.visible > *:nth-child(2) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 80ms;
+}
+
+.reveal-stagger.visible > *:nth-child(3) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 160ms;
+}
+
+.reveal-stagger.visible > *:nth-child(4) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 240ms;
+}
+
+.reveal-stagger.visible > *:nth-child(5) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 320ms;
+}
+
+.reveal-stagger.visible > *:nth-child(6) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 400ms;
+}
+
+/* 9. Keyboard focus rings (accessibility) */
+*:focus-visible {
+  outline: 2px solid var(--primary, #333);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+/* ── vaani.ai Pipeline: Mobile Safety Net (deterministic — never overflows) ── */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { overflow-x: hidden; max-width: 100%; }
+/* THE #1 fix: let flex/grid children shrink instead of forcing horizontal overflow */
+* { min-width: 0; }
+img, video, canvas, svg { max-width: 100%; height: auto; }
+
+@media (max-width: 767px) {
+  /* Force ANY inline/utility multi-column grid to a single column on phones (structural reflow) */
+  [style*="grid-template-columns"], [style*="gridTemplateColumns"],
+  .grid, [class*="grid-cols-"] { grid-template-columns: 1fr !important; }
+  /* Nav: wrap so links don't get cut off */
+  nav { height: auto !important; min-height: 56px !important; flex-wrap: wrap !important; padding-top: 6px !important; padding-bottom: 6px !important; align-items: center; }
+  nav > div, nav > ul { flex-wrap: wrap !important; gap: 8px !important; }
+  /* Buttons: wrap, never clip, ≥44px tap target */
+  button, a[role="button"] { white-space: normal !important; word-break: break-word; max-width: 100%; min-height: 44px; box-sizing: border-box; }
+  /* Inputs always fill container */
+  input, textarea, select { width: 100% !important; box-sizing: border-box !important; max-width: 100%; }
+  /* Tame oversized fixed-px widths so nothing exceeds the viewport */
+  [style*="width:"][style*="px"] { max-width: 100% !important; }
+}
