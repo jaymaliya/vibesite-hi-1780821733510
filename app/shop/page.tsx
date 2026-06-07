@@ -14,40 +14,65 @@ const products = [
   { id: 4, img: "/product-4.jpg", name: "Hi Crew Socks", description: "Hi", price: 199, badge: "" }
 ];
 
-const filters = ["All Products", "Bestsellers", "New Arrivals"];
+const categories = [
+  { label: "All", img: "/product-1.jpg" },
+  { label: "Tops", img: "/product-2.jpg" },
+  { label: "Accessories", img: "/product-3.jpg" },
+  { label: "Essentials", img: "/product-4.jpg" },
+  { label: "New In", img: "/product-1.jpg" },
+  { label: "Sale", img: "/product-3.jpg" },
+];
+
+const crowdFavourites = [
+  { id: 1, img: "/product-1.jpg", name: "Hi Classic Tee", price: 499 },
+  { id: 2, img: "/product-2.jpg", name: "Hi Polo Shirt", price: 799 },
+  { id: 3, img: "/product-3.jpg", name: "Hi Cotton Cap", price: 349 },
+  { id: 4, img: "/product-4.jpg", name: "Hi Crew Socks", price: 199 },
+];
 
 export default function ShopPage() {
   const router = useRouter();
   const { addItem } = useCart() ?? { addItem: () => {} };
 
-  const [activeFilter, setActiveFilter] = useState("All Products");
   const [addedIds, setAddedIds] = useState<Record<number, boolean>>({});
-  const [quickView, setQuickView] = useState<typeof products[0] | null>(null);
-  const [hoveredCard, setHoveredCard] = useState<number | null>(null);
-  const railRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState(0);
-  const [scrollStart, setScrollStart] = useState(0);
+  const [addedCrowdIds, setAddedCrowdIds] = useState<Record<number, boolean>>({});
+  const [subscribed, setSubscribed] = useState(false);
+  const [email, setEmail] = useState("");
 
-  const filteredProducts = activeFilter === "All Products"
-    ? products
-    : products.filter(p => p.category === activeFilter);
+  const catRailRef = useRef<HTMLDivElement>(null);
+  const crowdRailRef = useRef<HTMLDivElement>(null);
+  const [catDragging, setCatDragging] = useState(false);
+  const [catDragStart, setCatDragStart] = useState(0);
+  const [catScrollStart, setCatScrollStart] = useState(0);
+  const [crowdDragging, setCrowdDragging] = useState(false);
+  const [crowdDragStart, setCrowdDragStart] = useState(0);
+  const [crowdScrollStart, setCrowdScrollStart] = useState(0);
 
   useEffect(() => {
     const styleEl = document.createElement("style");
     styleEl.innerHTML = `
-      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@400;500;600;700&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
       .will-reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.65s ease-out, transform 0.65s ease-out; }
       .will-reveal.visible { opacity: 1; transform: translateY(0); }
       .rail-scroll::-webkit-scrollbar { display: none; }
       .rail-scroll { -ms-overflow-style: none; scrollbar-width: none; }
-      .quick-view-btn { opacity: 0; transition: opacity 0.2s ease; }
-      .product-card:hover .quick-view-btn { opacity: 1; }
-      @keyframes marquee-left {
-        0% { transform: translateX(0); }
-        100% { transform: translateX(-50%); }
+      @keyframes marquee-left { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+      .marquee-track { animation: marquee-left 28s linear infinite; }
+      .cat-tile:hover .cat-img { transform: scale(1.06); }
+      .product-card:hover .quick-overlay { opacity: 1; }
+      @media (max-width: 768px) {
+        .hero-grid { grid-template-columns: 1fr !important; min-height: auto !important; }
+        .hero-right { min-height: 56vw !important; }
+        .hero-left { padding-top: 100px !important; padding-bottom: 40px !important; }
+        .product-grid-3 { grid-template-columns: repeat(2, 1fr) !important; }
+        .story-split { grid-template-columns: 1fr !important; }
+        .bento-grid { grid-template-columns: 1fr !important; grid-template-rows: auto !important; }
+        .bento-tall { grid-row: span 1 !important; }
+        .bento-wide { grid-column: span 1 !important; }
       }
-      .marquee-track { animation: marquee-left 32s linear infinite; }
+      @media (max-width: 480px) {
+        .product-grid-3 { grid-template-columns: 1fr !important; }
+      }
     `;
     document.head.appendChild(styleEl);
 
@@ -78,130 +103,372 @@ export default function ShopPage() {
     setTimeout(() => setAddedIds(prev => ({ ...prev, [p.id]: false })), 1500);
   };
 
+  const handleAddCrowd = (p: typeof crowdFavourites[0], e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    addItem({ id: String(p.id), name: p.name, price: p.price, quantity: 1, image: p.img });
+    setAddedCrowdIds(prev => ({ ...prev, [p.id]: true }));
+    setTimeout(() => setAddedCrowdIds(prev => ({ ...prev, [p.id]: false })), 1500);
+  };
+
   const handleCardClick = (p: typeof products[0]) => {
     router.push(`/product?name=${encodeURIComponent(p.name)}&price=${p.price}&img=${encodeURIComponent(p.img)}`);
   };
 
-  // Rail drag-scroll
-  const onMouseDown = (e: React.MouseEvent) => {
-    if (!railRef.current) return;
-    setIsDragging(true);
-    setDragStart(e.pageX);
-    setScrollStart(railRef.current.scrollLeft);
+  // Category rail drag
+  const onCatMouseDown = (e: React.MouseEvent) => {
+    if (!catRailRef.current) return;
+    setCatDragging(true);
+    setCatDragStart(e.pageX);
+    setCatScrollStart(catRailRef.current.scrollLeft);
   };
-  const onMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !railRef.current) return;
-    railRef.current.scrollLeft = scrollStart - (e.pageX - dragStart);
+  const onCatMouseMove = (e: React.MouseEvent) => {
+    if (!catDragging || !catRailRef.current) return;
+    catRailRef.current.scrollLeft = catScrollStart - (e.pageX - catDragStart);
   };
-  const onMouseUp = () => setIsDragging(false);
+  const onCatMouseUp = () => setCatDragging(false);
+
+  // Crowd rail drag
+  const onCrowdMouseDown = (e: React.MouseEvent) => {
+    if (!crowdRailRef.current) return;
+    setCrowdDragging(true);
+    setCrowdDragStart(e.pageX);
+    setCrowdScrollStart(crowdRailRef.current.scrollLeft);
+  };
+  const onCrowdMouseMove = (e: React.MouseEvent) => {
+    if (!crowdDragging || !crowdRailRef.current) return;
+    crowdRailRef.current.scrollLeft = crowdScrollStart - (e.pageX - crowdDragStart);
+  };
+  const onCrowdMouseUp = () => setCrowdDragging(false);
 
   return (
     <div style={{ background: "var(--bg)", color: "var(--text)", fontFamily: "var(--font-body)", minHeight: "100vh", overflowX: "hidden" }}>
       <Navbar />
 
-      {/* ── PAGE HEADER ── */}
-      <section style={{ paddingTop: "120px", paddingBottom: "0", paddingLeft: "clamp(20px,5vw,80px)", paddingRight: "clamp(20px,5vw,80px)" }}>
-        <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
-          <p style={{ fontFamily: "var(--font-body)", fontSize: "0.7rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.18em", color: "var(--muted)", marginBottom: "12px" }}>
-            The Collection
+      {/* ── HERO: SPLIT_TEXT_LEFT ── */}
+      <section
+        className="hero-grid"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "60fr 40fr",
+          minHeight: "92vh",
+          position: "relative",
+        }}
+      >
+        {/* LEFT: text column */}
+        <div
+          className="hero-left"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            paddingTop: "120px",
+            paddingBottom: "80px",
+            paddingLeft: "clamp(24px,6vw,96px)",
+            paddingRight: "clamp(24px,4vw,64px)",
+            background: "var(--bg)",
+            zIndex: 2,
+          }}
+        >
+          <p style={{
+            fontFamily: "var(--font-body)",
+            fontSize: "0.7rem",
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.22em",
+            color: "var(--accent)",
+            marginBottom: "20px",
+          }}>
+            The Collection · 2025
           </p>
-          <h1 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(2.8rem,6vw,5rem)", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.05, color: "var(--text)", marginBottom: "24px" }}>
-            Everything you need.<br />Nothing you don't.
-          </h1>
-          {/* Trust strip */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "24px", alignItems: "center", fontSize: "0.8rem", color: "var(--muted)", fontFamily: "var(--font-body)", marginBottom: "40px" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              4.9 · 2,800+ reviews
-            </span>
-            <span>Made in India</span>
-            <span>Free delivery above ₹599</span>
-            <span>30-day returns</span>
-          </div>
-        </div>
-      </section>
 
-      {/* ── FILTER PILLS ── */}
-      <section className="reveal" style={{ paddingBottom: "32px", paddingLeft: "clamp(20px,5vw,80px)", paddingRight: "clamp(20px,5vw,80px)" }}>
-        <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-            {filters.map(f => (
-              <button
-                key={f}
-                onClick={() => setActiveFilter(f)}
-                style={{
-                  height: "36px",
-                  padding: "0 20px",
-                  borderRadius: "999px",
-                  border: activeFilter === f ? "none" : "1px solid #C8C4BC",
-                  background: activeFilter === f ? "var(--accent)" : "transparent",
-                  color: activeFilter === f ? "#fff" : "var(--text)",
-                  fontFamily: "var(--font-body)",
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  transition: "background 0.18s ease, color 0.18s ease, border-color 0.18s ease",
-                }}
-                onMouseEnter={e => { if (activeFilter !== f) (e.currentTarget.style.background = "var(--surface)"); }}
-                onMouseLeave={e => { if (activeFilter !== f) (e.currentTarget.style.background = "transparent"); }}
-              >
-                {f}
-              </button>
+          <h1 style={{
+            fontFamily: "var(--font-body)",
+            fontSize: "clamp(3.5rem, 6.5vw, 6rem)",
+            fontWeight: 800,
+            letterSpacing: "-0.02em",
+            lineHeight: 1.05,
+            color: "var(--text)",
+            marginBottom: "24px",
+            maxWidth: "640px",
+          }}>
+            Elevate Your<br />Every Day.
+          </h1>
+
+          <p style={{
+            fontFamily: "var(--font-body)",
+            fontSize: "clamp(1rem, 1.5vw, 1.125rem)",
+            fontWeight: 400,
+            lineHeight: 1.7,
+            color: "var(--muted)",
+            maxWidth: "440px",
+            marginBottom: "36px",
+          }}>
+            Essentials built for the urban Indian who moves with intention. Clean cuts, honest materials, no noise.
+          </p>
+
+          {/* Trust pills */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "36px" }}>
+            {[
+              { icon: "★", text: "4.9 · 2,800+ reviews" },
+              { icon: null, text: "Made in India" },
+              { icon: null, text: "Free delivery ₹599+" },
+              { icon: null, text: "30-day returns" },
+            ].map((pill, i) => (
+              <span key={i} style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "6px 14px",
+                borderRadius: "999px",
+                border: "1px solid color-mix(in srgb, var(--muted) 40%, transparent)",
+                fontSize: "0.75rem",
+                fontWeight: 500,
+                color: "var(--muted)",
+                fontFamily: "var(--font-body)",
+              }}>
+                {pill.icon && <span style={{ color: "var(--accent)", fontSize: "0.8rem" }}>{pill.icon}</span>}
+                {pill.text}
+              </span>
             ))}
           </div>
+
+          {/* CTA */}
+          <div style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
+            <button
+              onClick={() => document.getElementById('product-grid-section')?.scrollIntoView({ behavior: 'smooth' })}
+              style={{
+                height: "56px",
+                padding: "0 36px",
+                borderRadius: "4px",
+                border: "none",
+                background: "var(--accent)",
+                color: "#0E0C14",
+                fontFamily: "var(--font-body)",
+                fontSize: "1rem",
+                fontWeight: 700,
+                cursor: "pointer",
+                letterSpacing: "0.02em",
+                boxShadow: "none",
+                transition: "transform 0.15s ease",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.02)")}
+              onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
+              onMouseDown={e => (e.currentTarget.style.transform = "scale(0.98)")}
+              onMouseUp={e => (e.currentTarget.style.transform = "scale(1.02)")}
+            >
+              Discover Products
+            </button>
+            <span style={{ fontSize: "0.8125rem", color: "var(--muted)", fontFamily: "var(--font-body)" }}>
+              Trusted by 25,000+ happy customers
+            </span>
+          </div>
+        </div>
+
+        {/* RIGHT: full-bleed product image */}
+        <div
+          className="hero-right"
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            minHeight: "92vh",
+          }}
+        >
+          <img
+            src="/product-1.jpg"
+            alt="Hi Classic Tee — hero product shot"
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "center top",
+              display: "block",
+            }}
+          />
+          {/* Subtle left edge gradient so it bleeds into bg naturally */}
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            background: "linear-gradient(to right, var(--bg) 0%, transparent 18%)",
+            pointerEvents: "none",
+          }} />
+          {/* Price badge floating */}
+          <div style={{
+            position: "absolute",
+            bottom: "48px",
+            left: "28px",
+            background: "var(--accent)",
+            color: "#0E0C14",
+            fontFamily: "var(--font-body)",
+            fontWeight: 800,
+            fontSize: "1.125rem",
+            padding: "10px 20px",
+            borderRadius: "4px",
+            zIndex: 3,
+          }}>
+            From ₹199
+          </div>
         </div>
       </section>
 
-      {/* ── PRODUCT GRID ── */}
-      <section className="reveal" style={{ paddingBottom: "var(--space-section)", paddingLeft: "clamp(20px,5vw,80px)", paddingRight: "clamp(20px,5vw,80px)" }}>
+      {/* ── CATEGORY STRIP: HORIZONTAL_RAIL ── */}
+      <section
+        className="reveal"
+        style={{
+          borderBottom: "1px solid color-mix(in srgb, var(--muted) 25%, transparent)",
+          borderTop: "1px solid color-mix(in srgb, var(--muted) 25%, transparent)",
+          background: "var(--bg)",
+          padding: "0",
+        }}
+      >
+        <div
+          ref={catRailRef}
+          className="rail-scroll"
+          style={{
+            display: "flex",
+            gap: "0",
+            overflowX: "auto",
+            scrollSnapType: "x mandatory",
+            cursor: catDragging ? "grabbing" : "grab",
+            userSelect: "none",
+          }}
+          onMouseDown={onCatMouseDown}
+          onMouseMove={onCatMouseMove}
+          onMouseUp={onCatMouseUp}
+          onMouseLeave={onCatMouseUp}
+        >
+          {categories.map((cat, i) => (
+            <div
+              key={cat.label}
+              className="cat-tile"
+              style={{
+                flex: "0 0 auto",
+                width: "160px",
+                scrollSnapAlign: "start",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                padding: "24px 16px",
+                borderRight: i < categories.length - 1 ? "1px solid color-mix(in srgb, var(--muted) 25%, transparent)" : "none",
+                cursor: "pointer",
+                transition: "background 0.2s ease",
+              }}
+              onClick={() => document.getElementById('product-grid-section')?.scrollIntoView({ behavior: 'smooth' })}
+              onMouseEnter={e => (e.currentTarget.style.background = "color-mix(in srgb, var(--surface) 10%, transparent)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+            >
+              <div style={{
+                width: "100px",
+                height: "100px",
+                borderRadius: "8px",
+                overflow: "hidden",
+                marginBottom: "12px",
+                background: "color-mix(in srgb, var(--surface) 20%, transparent)",
+              }}>
+                <img
+                  src={cat.img}
+                  alt={cat.label}
+                  className="cat-img"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    transition: "transform 0.5s ease",
+                  }}
+                />
+              </div>
+              <span style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "0.8125rem",
+                fontWeight: 600,
+                color: "var(--text)",
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+              }}>
+                {cat.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── PRODUCT GRID: 3-column forced ── */}
+      <section
+        id="product-grid-section"
+        className="reveal"
+        style={{
+          padding: "80px clamp(20px,5vw,80px)",
+          background: "var(--bg)",
+        }}
+      >
         <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))", gap: "24px 24px" }}>
-            {filteredProducts.map(p => (
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: "40px", flexWrap: "wrap", gap: "12px" }}>
+            <h2 style={{
+              fontFamily: "var(--font-body)",
+              fontSize: "clamp(1.8rem,3vw,2.8rem)",
+              fontWeight: 700,
+              letterSpacing: "-0.02em",
+              color: "var(--text)",
+            }}>
+              All Products
+            </h2>
+            <span style={{ fontFamily: "var(--font-body)", fontSize: "0.875rem", color: "var(--muted)" }}>
+              {products.length} pieces
+            </span>
+          </div>
+
+          {/* Force 3-column grid — 4th card slot becomes a CTA tile */}
+          <div
+            className="product-grid-3"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: "24px",
+            }}
+          >
+            {products.map(p => (
               <article
                 key={p.id}
                 className="product-card"
                 style={{
                   position: "relative",
-                  background: "var(--surface)",
+                  background: "color-mix(in srgb, var(--surface) 15%, var(--bg))",
                   borderRadius: "var(--radius-md)",
                   overflow: "hidden",
                   cursor: "pointer",
                   boxShadow: "var(--shadow-sm)",
                   transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s cubic-bezier(0.4,0,0.2,1)",
+                  border: "1px solid color-mix(in srgb, var(--muted) 20%, transparent)",
                 }}
                 onMouseEnter={e => {
-                  setHoveredCard(p.id);
                   e.currentTarget.style.transform = "translateY(-4px)";
-                  e.currentTarget.style.boxShadow = "var(--shadow-md)";
+                  e.currentTarget.style.boxShadow = "var(--shadow-xl)";
                 }}
                 onMouseLeave={e => {
-                  setHoveredCard(null);
                   e.currentTarget.style.transform = "translateY(0)";
                   e.currentTarget.style.boxShadow = "var(--shadow-sm)";
                 }}
                 onClick={() => handleCardClick(p)}
               >
-                {/* Badge */}
                 {p.badge && (
                   <div style={{
                     position: "absolute",
                     top: "12px",
                     left: "12px",
-                    background: "var(--primary)",
-                    color: "#fff",
+                    background: "var(--accent)",
+                    color: "#0E0C14",
                     fontSize: "0.625rem",
                     fontWeight: 700,
-                    letterSpacing: "0.1em",
+                    letterSpacing: "0.12em",
                     textTransform: "uppercase",
-                    padding: "3px 8px",
+                    padding: "4px 10px",
                     borderRadius: "2px",
                     zIndex: 2,
                   }}>{p.badge}</div>
                 )}
 
-                {/* Image */}
-                <div style={{ overflow: "hidden", background: "var(--bg)" }}>
+                <div style={{ overflow: "hidden", background: "color-mix(in srgb, var(--bg) 80%, var(--surface))" }}>
                   <img
                     src={p.img}
                     alt={p.name}
@@ -212,65 +479,80 @@ export default function ShopPage() {
                       display: "block",
                       transition: "transform 0.6s ease",
                     }}
-                    onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.04)")}
+                    onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.05)")}
                     onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
                   />
                 </div>
 
-                {/* Quick View overlay */}
+                {/* Quick view overlay */}
                 <div
-                  className="quick-view-btn"
+                  className="quick-overlay"
                   style={{
                     position: "absolute",
-                    bottom: "96px",
+                    bottom: "88px",
                     left: "50%",
                     transform: "translateX(-50%)",
+                    opacity: 0,
+                    transition: "opacity 0.2s ease",
                     zIndex: 3,
+                    whiteSpace: "nowrap",
                   }}
-                  onClick={e => { e.stopPropagation(); setQuickView(p); }}
+                  onClick={e => {
+                    e.stopPropagation();
+                    handleCardClick(p);
+                  }}
                 >
                   <div style={{
-                    height: "38px",
-                    padding: "0 20px",
-                    borderRadius: "var(--radius-sm)",
-                    border: "2px solid var(--accent)",
-                    background: "rgba(245,240,232,0.95)",
+                    padding: "8px 18px",
+                    borderRadius: "2px",
+                    border: "1.5px solid var(--accent)",
+                    background: "color-mix(in srgb, var(--bg) 85%, transparent)",
                     color: "var(--accent)",
                     fontFamily: "var(--font-body)",
-                    fontSize: "0.8125rem",
+                    fontSize: "0.75rem",
                     fontWeight: 600,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    whiteSpace: "nowrap",
+                    backdropFilter: "blur(8px)",
                     cursor: "pointer",
-                    backdropFilter: "blur(4px)",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
                   }}>
-                    Quick View
+                    View Details
                   </div>
                 </div>
 
-                {/* Card info */}
-                <div style={{ padding: "16px 16px 20px" }}>
-                  <p style={{ fontFamily: "var(--font-body)", fontSize: "0.75rem", color: "var(--muted)", marginBottom: "4px" }}>{p.description}</p>
-                  <h3 style={{ fontFamily: "var(--font-body)", fontSize: "0.9375rem", fontWeight: 600, color: "var(--text)", marginBottom: "6px", lineHeight: 1.3 }}>{p.name}</h3>
+                <div style={{ padding: "16px 20px 20px" }}>
+                  <h3 style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: "0.9375rem",
+                    fontWeight: 600,
+                    color: "var(--text)",
+                    marginBottom: "8px",
+                    lineHeight: 1.3,
+                  }}>{p.name}</h3>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
-                    <p style={{ fontFamily: "var(--font-body)", fontSize: "1rem", fontWeight: 700, color: "var(--accent)" }}>₹{p.price.toLocaleString("en-IN")}</p>
+                    <p style={{
+                      fontFamily: "var(--font-body)",
+                      fontSize: "1rem",
+                      fontWeight: 700,
+                      color: "var(--accent)",
+                    }}>₹{p.price.toLocaleString("en-IN")}</p>
                     <button
                       onClick={e => handleAddToCart(p, e)}
                       style={{
-                        height: "36px",
+                        height: "34px",
                         padding: "0 16px",
-                        borderRadius: "var(--radius-sm)",
+                        borderRadius: "4px",
                         border: "none",
-                        background: addedIds[p.id] ? "var(--primary)" : "var(--accent)",
-                        color: "#fff",
+                        background: addedIds[p.id] ? "var(--muted)" : "var(--accent)",
+                        color: "#0E0C14",
                         fontFamily: "var(--font-body)",
                         fontSize: "0.8125rem",
-                        fontWeight: 600,
+                        fontWeight: 700,
                         cursor: "pointer",
                         whiteSpace: "nowrap",
-                        transition: "background 0.18s ease, transform 0.15s ease",
+                        boxShadow: "none",
+                        transition: "transform 0.15s ease, background 0.18s ease",
+                        letterSpacing: "0.02em",
                       }}
                       onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.02)")}
                       onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
@@ -283,153 +565,668 @@ export default function ShopPage() {
                 </div>
               </article>
             ))}
+
+            {/* CTA tile — prevents orphaned card on grid row 2 */}
+            <div
+              style={{
+                borderRadius: "var(--radius-md)",
+                border: "2px dashed color-mix(in srgb, var(--accent) 40%, transparent)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "16px",
+                padding: "40px 24px",
+                cursor: "pointer",
+                transition: "border-color 0.2s ease, background 0.2s ease",
+                background: "transparent",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = "var(--accent)";
+                e.currentTarget.style.background = "color-mix(in srgb, var(--accent) 6%, transparent)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = "color-mix(in srgb, var(--accent) 40%, transparent)";
+                e.currentTarget.style.background = "transparent";
+              }}
+              onClick={() => router.push('/shop')}
+            >
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+              </svg>
+              <p style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "0.9375rem",
+                fontWeight: 600,
+                color: "var(--accent)",
+                textAlign: "center",
+                lineHeight: 1.4,
+              }}>
+                More arriving<br />soon
+              </p>
+              <span style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "0.75rem",
+                color: "var(--muted)",
+                textAlign: "center",
+              }}>
+                New drops every month
+              </span>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ── TRUST / MARQUEE STRIP ── */}
-      <section className="reveal" style={{ background: "var(--accent)", overflow: "hidden", padding: "18px 0" }}>
-        <div className="marquee-track" style={{ display: "flex", gap: "0", width: "max-content" }}>
-          {[
-            "Confidence in a bottle",
-            "Made with intention",
-            "Clean formulas · Real results",
-            "Trusted by 25,000+ customers",
-            "Free delivery above ₹599",
-            "Made in India",
-            "Confidence in a bottle",
-            "Made with intention",
-            "Clean formulas · Real results",
-            "Trusted by 25,000+ customers",
-            "Free delivery above ₹599",
-            "Made in India",
-          ].map((t, i) => (
-            <span key={i} style={{ fontFamily: "var(--font-body)", fontSize: "0.8125rem", fontWeight: 600, color: "#fff", textTransform: "uppercase", letterSpacing: "0.15em", whiteSpace: "nowrap", padding: "0 40px" }}>
-              {t}
-              <span style={{ marginLeft: "40px", color: "rgba(255,255,255,0.4)" }}>·</span>
-            </span>
-          ))}
-        </div>
-      </section>
-
-      {/* ── STORY SPLIT: ASYMMETRIC ── */}
-      <section className="reveal" id="about" style={{ background: "var(--surface)", padding: "var(--space-section) clamp(20px,5vw,80px)" }}>
-        <div style={{ maxWidth: "1280px", margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))", gap: "64px", alignItems: "center" }}>
-          {/* Image */}
-          <div style={{ overflow: "hidden", borderRadius: "var(--radius-lg)", background: "var(--surface)" }}>
-            <img
-              src="/product-1.jpg"
-              alt="Hi product story — close crop editorial"
-              style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block", transition: "transform 0.7s ease" }}
-              onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.04)")}
-              onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
-            />
-          </div>
-          {/* Text */}
+      {/* ── STORY SPLIT: ASYMMETRIC_SPLIT ── */}
+      <section
+        className="reveal"
+        id="story-section"
+        style={{
+          padding: "80px clamp(20px,5vw,80px)",
+          background: "color-mix(in srgb, var(--surface) 8%, var(--bg))",
+        }}
+      >
+        <div
+          className="story-split"
+          style={{
+            maxWidth: "1280px",
+            margin: "0 auto",
+            display: "grid",
+            gridTemplateColumns: "60fr 40fr",
+            gap: "64px",
+            alignItems: "center",
+          }}
+        >
           <div>
-            <p style={{ fontFamily: "var(--font-body)", fontSize: "0.7rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.18em", color: "var(--accent)", marginBottom: "16px" }}>Our Story</p>
-            <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(2rem,4vw,3.2rem)", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.1, color: "var(--text)", marginBottom: "24px" }}>
-              Built for the<br />room you're about<br />to walk into.
+            <p style={{
+              fontFamily: "var(--font-body)",
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.22em",
+              color: "var(--accent)",
+              marginBottom: "20px",
+            }}>
+              Our Story
+            </p>
+            <h2 style={{
+              fontFamily: "var(--font-body)",
+              fontSize: "clamp(2rem,3.5vw,3.2rem)",
+              fontWeight: 700,
+              letterSpacing: "-0.025em",
+              lineHeight: 1.1,
+              color: "var(--text)",
+              marginBottom: "24px",
+            }}>
+              Built for the room<br />you're about to walk into.
             </h2>
-            <p style={{ fontFamily: "var(--font-body)", fontSize: "1rem", lineHeight: 1.75, color: "var(--muted)", marginBottom: "32px", maxWidth: "480px" }}>
-              Hi was born from a simple truth — how you feel in your skin shapes every interaction. We stripped every formula back to what works, sourced ingredients with intention, and built a range that fits into your life without demanding attention.
+            <p style={{
+              fontFamily: "var(--font-body)",
+              fontSize: "1rem",
+              lineHeight: 1.75,
+              color: "var(--muted)",
+              maxWidth: "480px",
+              marginBottom: "32px",
+            }}>
+              Hi was born from a simple conviction: great everyday essentials shouldn't be a trade-off between quality and price. Every piece is designed in India for India — cut for real bodies, made to outlast the algorithm.
             </p>
             <button
-              onClick={() => router.push('/shop')}
+              onClick={() => document.getElementById('story-section')?.scrollIntoView({ behavior: 'smooth' })}
               style={{
                 height: "48px",
                 padding: "0 28px",
-                borderRadius: "var(--radius-sm)",
-                border: "2px solid var(--accent)",
+                borderRadius: "4px",
+                border: "1.5px solid var(--accent)",
                 background: "transparent",
                 color: "var(--accent)",
                 fontFamily: "var(--font-body)",
                 fontSize: "0.9375rem",
                 fontWeight: 600,
                 cursor: "pointer",
-                whiteSpace: "nowrap",
-                transition: "background 0.18s ease, color 0.18s ease, transform 0.15s ease",
+                boxShadow: "none",
+                transition: "transform 0.15s ease, background 0.18s ease",
+                letterSpacing: "0.02em",
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = "var(--accent)"; e.currentTarget.style.color = "#fff"; e.currentTarget.style.transform = "scale(1.02)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--accent)"; e.currentTarget.style.transform = "scale(1)"; }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = "scale(1.02)";
+                e.currentTarget.style.background = "color-mix(in srgb, var(--accent) 10%, transparent)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = "scale(1)";
+                e.currentTarget.style.background = "transparent";
+              }}
+              onMouseDown={e => (e.currentTarget.style.transform = "scale(0.98)")}
+              onMouseUp={e => (e.currentTarget.style.transform = "scale(1.02)")}
             >
-              Explore the Range
+              The Hi Philosophy
             </button>
           </div>
+
+          <div style={{ overflow: "hidden", borderRadius: "var(--radius-lg)" }}>
+            <img
+              src="/product-2.jpg"
+              alt="Hi brand story — quality craftsmanship"
+              style={{
+                width: "100%",
+                aspectRatio: "3/4",
+                objectFit: "cover",
+                display: "block",
+                transition: "transform 0.7s ease",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.05)")}
+              onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
+            />
+          </div>
         </div>
       </section>
 
-      {/* ── BENTO FEATURE GRID ── */}
-      <section className="reveal" id="features" style={{ background: "var(--bg)", padding: "var(--space-section) clamp(20px,5vw,80px)" }}>
+      {/* ── INGREDIENT CLOSEUP: BENTO with named grid areas ── */}
+      <section
+        className="reveal"
+        style={{
+          padding: "80px clamp(20px,5vw,80px)",
+          background: "var(--bg)",
+        }}
+      >
         <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
-          <p style={{ fontFamily: "var(--font-body)", fontSize: "0.7rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.18em", color: "var(--muted)", marginBottom: "12px" }}>Why Hi</p>
-          <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(2rem,4vw,3rem)", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.1, color: "var(--text)", marginBottom: "48px" }}>
-            Formulated to deliver.
-          </h2>
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))",
-            gap: "16px",
+          <p style={{
+            fontFamily: "var(--font-body)",
+            fontSize: "0.7rem",
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.22em",
+            color: "var(--accent)",
+            marginBottom: "16px",
           }}>
-            {/* Tile 1 — tall */}
-            <div style={{ gridRow: "span 2", background: "var(--surface)", borderRadius: "var(--radius-lg)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              <div style={{ overflow: "hidden", flex: "1" }}>
-                <img src="/product-1.jpg" alt="Hi product detail shot" style={{ width: "100%", height: "100%", minHeight: "220px", objectFit: "cover", display: "block", transition: "transform 0.7s ease" }}
-                  onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.05)")}
-                  onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")} />
-              </div>
-              <div style={{ padding: "24px" }}>
-                <p style={{ fontFamily: "var(--font-body)", fontSize: "0.7rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.14em", color: "var(--accent)", marginBottom: "8px" }}>Real ingredients</p>
-                <p style={{ fontFamily: "var(--font-body)", fontSize: "0.9rem", lineHeight: 1.65, color: "var(--muted)" }}>Every formula traces back to a source we've verified — no fillers, no shortcuts.</p>
+            Formulated to deliver
+          </p>
+          <h2 style={{
+            fontFamily: "var(--font-body)",
+            fontSize: "clamp(1.8rem,3vw,2.8rem)",
+            fontWeight: 700,
+            letterSpacing: "-0.02em",
+            color: "var(--text)",
+            marginBottom: "40px",
+          }}>
+            Every detail. On purpose.
+          </h2>
+
+          {/* Bento: tall image left (2 rows), wide stat top-right, icon tile bottom-right */}
+          <div
+            className="bento-grid"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gridTemplateRows: "300px 160px",
+              gap: "16px",
+            }}
+          >
+            {/* Tall image — left, spans 2 rows */}
+            <div
+              className="bento-tall"
+              style={{
+                gridRow: "span 2",
+                overflow: "hidden",
+                borderRadius: "var(--radius-lg)",
+                position: "relative",
+              }}
+            >
+              <img
+                src="/product-3.jpg"
+                alt="Hi Cotton Cap — precision craftsmanship detail"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  display: "block",
+                  transition: "transform 0.7s ease",
+                }}
+                onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.05)")}
+                onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
+              />
+              <div style={{
+                position: "absolute",
+                bottom: "24px",
+                left: "24px",
+                background: "color-mix(in srgb, var(--bg) 70%, transparent)",
+                backdropFilter: "blur(12px)",
+                padding: "12px 20px",
+                borderRadius: "4px",
+              }}>
+                <p style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: "0.8125rem",
+                  fontWeight: 600,
+                  color: "var(--text)",
+                  letterSpacing: "0.04em",
+                }}>Precision fit, always</p>
               </div>
             </div>
-            {/* Tile 2 */}
-            <div style={{ background: "var(--primary)", borderRadius: "var(--radius-lg)", padding: "32px", display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: "160px" }}>
-              <p style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(2.5rem,4vw,3.5rem)", fontWeight: 700, color: "#fff", lineHeight: 1 }}>28</p>
+
+            {/* Wide stat tile — top right, 2px solid border */}
+            <div
+              className="bento-wide"
+              style={{
+                borderRadius: "var(--radius-lg)",
+                border: "2px solid #1a1a1a",
+                background: "color-mix(in srgb, var(--surface) 15%, var(--bg))",
+                display: "flex",
+                alignItems: "center",
+                padding: "32px",
+                gap: "24px",
+              }}
+            >
               <div>
-                <p style={{ fontFamily: "var(--font-body)", fontSize: "0.875rem", fontWeight: 600, color: "rgba(255,255,255,0.9)", marginBottom: "4px" }}>Days to visible result</p>
-                <p style={{ fontFamily: "var(--font-body)", fontSize: "0.8rem", color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>Clinically observed. Consistency-backed.</p>
+                <p style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: "clamp(3rem,5vw,5rem)",
+                  fontWeight: 800,
+                  color: "var(--accent)",
+                  lineHeight: 1,
+                  letterSpacing: "-0.04em",
+                }}>28</p>
+                <p style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: "0.875rem",
+                  color: "var(--muted)",
+                  lineHeight: 1.5,
+                  marginTop: "6px",
+                }}>thread counts<br />above industry standard</p>
               </div>
+              <div style={{
+                width: "1px",
+                alignSelf: "stretch",
+                background: "color-mix(in srgb, var(--muted) 30%, transparent)",
+                flexShrink: 0,
+              }} />
+              <p style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "0.875rem",
+                color: "var(--muted)",
+                lineHeight: 1.6,
+              }}>
+                We source only certified cotton that outlasts fast fashion by years, not seasons.
+              </p>
             </div>
-            {/* Tile 3 */}
-            <div style={{ background: "var(--accent)", borderRadius: "var(--radius-lg)", padding: "32px", display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: "160px" }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+
+            {/* Small icon tile — bottom right */}
+            <div
+              style={{
+                borderRadius: "var(--radius-md)",
+                background: "var(--accent)",
+                display: "flex",
+                alignItems: "center",
+                gap: "16px",
+                padding: "24px",
+              }}
+            >
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0E0C14" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
               <div>
-                <p style={{ fontFamily: "var(--font-body)", fontSize: "0.875rem", fontWeight: 600, color: "#fff", marginBottom: "4px" }}>Dermatologist tested</p>
-                <p style={{ fontFamily: "var(--font-body)", fontSize: "0.8rem", color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>Safe for all skin types. Patch-tested every batch.</p>
+                <p style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: "0.9375rem",
+                  fontWeight: 700,
+                  color: "#0E0C14",
+                  lineHeight: 1.2,
+                }}>Zero compromise</p>
+                <p style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: "0.75rem",
+                  color: "color-mix(in srgb, #0E0C14 70%, transparent)",
+                  marginTop: "4px",
+                }}>OEKO-TEX certified fabrics</p>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── CROWD FAVOURITES: Horizontal Drag Rail ── */}
-      <section className="reveal" style={{ background: "var(--surface)", padding: "var(--space-section) 0" }}>
-        <div style={{ maxWidth: "1280px", margin: "0 auto", paddingLeft: "clamp(20px,5vw,80px)", paddingRight: "clamp(20px,5vw,80px)", marginBottom: "32px" }}>
-          <p style={{ fontFamily: "var(--font-body)", fontSize: "0.7rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.18em", color: "var(--muted)", marginBottom: "12px" }}>Crowd Favourites</p>
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
-            <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(1.8rem,3.5vw,2.8rem)", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.1, color: "var(--text)" }}>
-              What people keep<br />coming back for.
+      {/* ── BRAND MANIFESTO: full-bleed near-black band ── */}
+      <section
+        className="reveal"
+        style={{
+          background: "#1a1a1a",
+          padding: "96px clamp(24px,6vw,96px)",
+        }}
+      >
+        <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+          {/* 2px terracotta horizontal rule above quote mark */}
+          <div style={{
+            width: "48px",
+            height: "2px",
+            background: "var(--accent)",
+            marginBottom: "32px",
+          }} />
+          <p style={{
+            fontFamily: "var(--font-body)",
+            fontSize: "clamp(2rem,3.5vw,3rem)",
+            fontWeight: 700,
+            letterSpacing: "-0.025em",
+            lineHeight: 1.2,
+            color: "var(--primary)",
+            marginBottom: "32px",
+          }}>
+            "We didn't build Hi for the algorithm. We built it for the room you walk into — and the way you own it."
+          </p>
+          <p style={{
+            fontFamily: "var(--font-body)",
+            fontSize: "0.875rem",
+            fontWeight: 600,
+            color: "var(--accent)",
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+          }}>
+            — The Hi Founders
+          </p>
+        </div>
+      </section>
+
+      {/* ── FEATURE TRIO: BENTO_MOSAIC ── */}
+      <section
+        className="reveal"
+        style={{
+          padding: "80px clamp(20px,5vw,80px)",
+          background: "var(--bg)",
+        }}
+      >
+        <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
+          <h2 style={{
+            fontFamily: "var(--font-body)",
+            fontSize: "clamp(1.8rem,3vw,2.6rem)",
+            fontWeight: 700,
+            letterSpacing: "-0.02em",
+            color: "var(--text)",
+            marginBottom: "40px",
+          }}>
+            Why Hi?
+          </h2>
+
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: "16px",
+            gridAutoRows: "220px",
+          }}>
+            {/* Large tile — spans 2 cols */}
+            <div style={{
+              gridColumn: "span 2",
+              borderRadius: "var(--radius-lg)",
+              overflow: "hidden",
+              position: "relative",
+            }}>
+              <img
+                src="/product-4.jpg"
+                alt="Hi brand essentials quality showcase"
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.7s ease" }}
+                onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.04)")}
+                onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
+              />
+              <div style={{
+                position: "absolute",
+                inset: 0,
+                background: "linear-gradient(to top, color-mix(in srgb, var(--bg) 80%, transparent) 0%, transparent 50%)",
+              }} />
+              <div style={{
+                position: "absolute",
+                bottom: "20px",
+                left: "20px",
+              }}>
+                <p style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: "1.125rem",
+                  fontWeight: 700,
+                  color: "var(--text)",
+                }}>Real quality.<br />Real price.</p>
+              </div>
+            </div>
+
+            {/* Stat tile — tall, spans 2 rows */}
+            <div style={{
+              gridRow: "span 2",
+              borderRadius: "var(--radius-lg)",
+              background: "color-mix(in srgb, var(--accent) 12%, var(--bg))",
+              border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "flex-start",
+              padding: "32px",
+              gap: "16px",
+            }}>
+              <p style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "clamp(3rem,4vw,4rem)",
+                fontWeight: 800,
+                color: "var(--accent)",
+                lineHeight: 1,
+                letterSpacing: "-0.04em",
+              }}>25k+</p>
+              <p style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "1rem",
+                fontWeight: 600,
+                color: "var(--text)",
+                lineHeight: 1.4,
+              }}>Happy customers across India</p>
+              <p style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "0.8125rem",
+                color: "var(--muted)",
+                lineHeight: 1.6,
+              }}>
+                From Mumbai to Manipur — Hi is worn by people who know what they want.
+              </p>
+            </div>
+
+            {/* Small icon tile */}
+            <div style={{
+              borderRadius: "var(--radius-md)",
+              background: "color-mix(in srgb, var(--surface) 12%, var(--bg))",
+              border: "1px solid color-mix(in srgb, var(--muted) 20%, transparent)",
+              display: "flex",
+              alignItems: "center",
+              gap: "14px",
+              padding: "24px",
+            }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              <div>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: "0.875rem", fontWeight: 700, color: "var(--text)" }}>Made in India</p>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: "0.75rem", color: "var(--muted)", marginTop: "2px" }}>Every stitch, every time</p>
+              </div>
+            </div>
+
+            {/* Testimonial tile */}
+            <div style={{
+              borderRadius: "var(--radius-md)",
+              background: "color-mix(in srgb, var(--primary) 8%, var(--bg))",
+              border: "1px solid color-mix(in srgb, var(--muted) 18%, transparent)",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              padding: "24px",
+            }}>
+              <p style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "0.875rem",
+                fontStyle: "italic",
+                color: "var(--text)",
+                lineHeight: 1.6,
+              }}>
+                "Wore the Hi Tee to three meetings. Got asked where I got it at all three."
+              </p>
+              <p style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "0.75rem",
+                color: "var(--accent)",
+                fontWeight: 600,
+                marginTop: "12px",
+              }}>★★★★★ · Arjun, Bengaluru</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── NEWSLETTER ── */}
+      <section
+        className="reveal"
+        style={{
+          padding: "80px clamp(20px,5vw,80px)",
+          background: "color-mix(in srgb, var(--surface) 8%, var(--bg))",
+          borderTop: "1px solid color-mix(in srgb, var(--muted) 20%, transparent)",
+        }}
+      >
+        <div style={{ maxWidth: "560px", margin: "0 auto", textAlign: "center" }}>
+          <p style={{
+            fontFamily: "var(--font-body)",
+            fontSize: "0.7rem",
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.22em",
+            color: "var(--accent)",
+            marginBottom: "16px",
+          }}>
+            Stay in the loop
+          </p>
+          <h2 style={{
+            fontFamily: "var(--font-body)",
+            fontSize: "clamp(1.8rem,3vw,2.6rem)",
+            fontWeight: 700,
+            letterSpacing: "-0.02em",
+            color: "var(--text)",
+            marginBottom: "12px",
+          }}>
+            New drops. First.
+          </h2>
+          <p style={{
+            fontFamily: "var(--font-body)",
+            fontSize: "1rem",
+            color: "var(--muted)",
+            lineHeight: 1.7,
+            marginBottom: "32px",
+          }}>
+            Join 25,000+ Hi customers who get early access to new collections and exclusive offers.
+          </p>
+
+          {subscribed ? (
+            <div style={{
+              padding: "20px 32px",
+              borderRadius: "4px",
+              background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--accent) 40%, transparent)",
+            }}>
+              <p style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "1rem",
+                fontWeight: 600,
+                color: "var(--accent)",
+              }}>You're in. Watch your inbox.</p>
+            </div>
+          ) : (
+            <form
+              onSubmit={e => { e.preventDefault(); if (email.trim()) setSubscribed(true); }}
+              style={{ display: "flex", gap: "0", maxWidth: "460px", margin: "0 auto" }}
+            >
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                required
+                style={{
+                  flex: 1,
+                  height: "52px",
+                  padding: "0 20px",
+                  borderRadius: "4px 0 0 4px",
+                  border: "1.5px solid color-mix(in srgb, var(--muted) 40%, transparent)",
+                  borderRight: "none",
+                  background: "color-mix(in srgb, var(--surface) 8%, var(--bg))",
+                  color: "var(--text)",
+                  fontFamily: "var(--font-body)",
+                  fontSize: "0.9375rem",
+                  outline: "none",
+                }}
+              />
+              <button
+                type="submit"
+                style={{
+                  height: "52px",
+                  padding: "0 28px",
+                  borderRadius: "0 4px 4px 0",
+                  border: "none",
+                  background: "var(--accent)",
+                  color: "#0E0C14",
+                  fontFamily: "var(--font-body)",
+                  fontSize: "0.9375rem",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  boxShadow: "none",
+                  whiteSpace: "nowrap",
+                  transition: "transform 0.15s ease",
+                  letterSpacing: "0.02em",
+                }}
+                onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.02)")}
+                onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
+                onMouseDown={e => (e.currentTarget.style.transform = "scale(0.98)")}
+                onMouseUp={e => (e.currentTarget.style.transform = "scale(1.02)")}
+              >
+                Subscribe
+              </button>
+            </form>
+          )}
+        </div>
+      </section>
+
+      {/* ── CROWD FAVOURITES: HORIZONTAL_RAIL — white cards ── */}
+      <section
+        className="reveal"
+        style={{
+          padding: "80px 0",
+          background: "var(--bg)",
+          borderTop: "1px solid color-mix(in srgb, var(--muted) 20%, transparent)",
+        }}
+      >
+        <div style={{ paddingLeft: "clamp(20px,5vw,80px)", paddingRight: "clamp(20px,5vw,80px)", marginBottom: "32px" }}>
+          <div style={{ maxWidth: "1280px", margin: "0 auto", display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+            <h2 style={{
+              fontFamily: "var(--font-body)",
+              fontSize: "clamp(1.8rem,3vw,2.6rem)",
+              fontWeight: 700,
+              letterSpacing: "-0.02em",
+              color: "var(--text)",
+            }}>
+              Crowd Favourites
             </h2>
             <button
               onClick={() => router.push('/shop')}
-              style={{ height: "40px", padding: "0 20px", borderRadius: "var(--radius-sm)", border: "1px solid var(--primary)", background: "transparent", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: "0.875rem", fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", transition: "background 0.18s ease, transform 0.15s ease" }}
-              onMouseEnter={e => { e.currentTarget.style.background = "var(--primary)"; e.currentTarget.style.color = "#fff"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text)"; }}
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "0.875rem",
+                fontWeight: 600,
+                color: "var(--accent)",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                letterSpacing: "0.04em",
+                textDecoration: "underline",
+                textUnderlineOffset: "4px",
+                transition: "transform 0.15s ease",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.02)")}
+              onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
             >
               View All
             </button>
           </div>
         </div>
 
-        {/* Rail */}
+        {/* Horizontal drag-scroll rail */}
         <div
-          ref={railRef}
+          ref={crowdRailRef}
           className="rail-scroll"
-          onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-          onMouseUp={onMouseUp}
-          onMouseLeave={onMouseUp}
           style={{
             display: "flex",
             gap: "20px",
@@ -437,220 +1234,144 @@ export default function ShopPage() {
             scrollSnapType: "x mandatory",
             paddingLeft: "clamp(20px,5vw,80px)",
             paddingRight: "clamp(20px,5vw,80px)",
-            paddingBottom: "8px",
-            cursor: isDragging ? "grabbing" : "grab",
+            cursor: crowdDragging ? "grabbing" : "grab",
             userSelect: "none",
+            paddingBottom: "8px",
           }}
+          onMouseDown={onCrowdMouseDown}
+          onMouseMove={onCrowdMouseMove}
+          onMouseUp={onCrowdMouseUp}
+          onMouseLeave={onCrowdMouseUp}
         >
-          {products.map(p => (
+          {crowdFavourites.map(p => (
             <div
               key={p.id}
               style={{
                 flex: "0 0 auto",
-                width: "clamp(240px,30vw,280px)",
+                width: "280px",
                 scrollSnapAlign: "start",
-                background: "var(--bg)",
+                background: "#ffffff",
+                border: "1px solid #e5e5e5",
                 borderRadius: "var(--radius-md)",
                 overflow: "hidden",
-                position: "relative",
-                boxShadow: "var(--shadow-sm)",
-                transition: "transform 0.3s ease, box-shadow 0.3s ease",
                 cursor: "pointer",
+                transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s cubic-bezier(0.4,0,0.2,1)",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
               }}
-              onClick={() => handleCardClick(p)}
-              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "var(--shadow-md)"; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "var(--shadow-sm)"; }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = "translateY(-4px)";
+                e.currentTarget.style.boxShadow = "0 12px 32px rgba(0,0,0,0.12)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)";
+              }}
+              onClick={() => router.push(`/product?name=${encodeURIComponent(p.name)}&price=${p.price}&img=${encodeURIComponent(p.img)}`)}
             >
-              {/* BEST badge */}
-              <div style={{ position: "absolute", top: "14px", right: "14px", width: "36px", height: "36px", borderRadius: "50%", background: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2 }}>
-                <span style={{ fontFamily: "var(--font-body)", fontSize: "0.5625rem", fontWeight: 700, color: "#fff", letterSpacing: "0.04em" }}>BEST</span>
-              </div>
-              <div style={{ overflow: "hidden", background: "var(--bg)" }}>
+              <div style={{ overflow: "hidden", background: "#f4f4f4" }}>
                 <img
                   src={p.img}
                   alt={p.name}
-                  style={{ width: "100%", aspectRatio: "1/1", objectFit: "cover", display: "block", borderRadius: "4px", transition: "transform 0.6s ease" }}
-                  onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.04)")}
+                  style={{
+                    width: "100%",
+                    aspectRatio: "1/1",
+                    objectFit: "cover",
+                    display: "block",
+                    transition: "transform 0.6s ease",
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.05)")}
                   onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
                 />
               </div>
-              <div style={{ padding: "14px 16px 18px" }}>
-                <h3 style={{ fontFamily: "var(--font-body)", fontSize: "0.9375rem", fontWeight: 600, color: "var(--text)", marginBottom: "4px" }}>{p.name}</h3>
-                <p style={{ fontFamily: "var(--font-body)", fontSize: "1rem", fontWeight: 700, color: "var(--accent)" }}>₹{p.price.toLocaleString("en-IN")}</p>
+              <div style={{ padding: "16px 18px 18px" }}>
+                <h3 style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: "0.9375rem",
+                  fontWeight: 600,
+                  color: "#1a1a1a",
+                  marginBottom: "8px",
+                  lineHeight: 1.3,
+                }}>{p.name}</h3>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                  <p style={{
+                    fontFamily: "var(--font-body)",
+                    fontSize: "1rem",
+                    fontWeight: 700,
+                    color: "var(--accent)",
+                  }}>₹{p.price.toLocaleString("en-IN")}</p>
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      handleAddCrowd(p, e);
+                    }}
+                    style={{
+                      height: "32px",
+                      padding: "0 14px",
+                      borderRadius: "4px",
+                      border: "none",
+                      background: addedCrowdIds[p.id] ? "#888" : "var(--accent)",
+                      color: "#0E0C14",
+                      fontFamily: "var(--font-body)",
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      boxShadow: "none",
+                      transition: "transform 0.15s ease, background 0.18s ease",
+                      letterSpacing: "0.02em",
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.02)")}
+                    onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
+                    onMouseDown={e => (e.currentTarget.style.transform = "scale(0.98)")}
+                    onMouseUp={e => (e.currentTarget.style.transform = "scale(1.02)")}
+                  >
+                    {addedCrowdIds[p.id] ? "Added ✓" : "Add to Bag"}
+                  </button>
+                </div>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* ── BRAND MANIFESTO ── */}
-      <section className="reveal" style={{ background: "#fff", padding: "var(--space-section) clamp(20px,5vw,80px)" }}>
-        <div style={{ maxWidth: "800px", margin: "0 auto", textAlign: "center" }}>
-          <div style={{ width: "60px", height: "1px", background: "#CCCCCC", margin: "0 auto 40px" }} />
-          <blockquote style={{
-            fontFamily: "var(--font-heading)",
-            fontSize: "clamp(1.75rem,4vw,3rem)",
-            fontStyle: "italic",
-            fontWeight: 400,
-            lineHeight: 1.35,
-            letterSpacing: "-0.01em",
-            color: "var(--text)",
-            margin: "0",
-          }}>
-            "Confidence isn't loud. It's the quiet certainty that you've already handled it."
-          </blockquote>
-          <div style={{ width: "60px", height: "1px", background: "#CCCCCC", margin: "40px auto 0" }} />
-        </div>
-      </section>
-
-      {/* ── NEWSLETTER ── */}
-      <section className="reveal" style={{ background: "var(--primary)", padding: "var(--space-section) clamp(20px,5vw,80px)" }}>
-        <div style={{ maxWidth: "600px", margin: "0 auto", textAlign: "center" }}>
-          <p style={{ fontFamily: "var(--font-body)", fontSize: "0.7rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.18em", color: "rgba(255,255,255,0.5)", marginBottom: "16px" }}>Stay in the loop</p>
-          <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(1.8rem,4vw,2.8rem)", fontWeight: 700, color: "#fff", letterSpacing: "-0.02em", lineHeight: 1.15, marginBottom: "16px" }}>
-            New arrivals. Real stories.<br />No noise.
-          </h2>
-          <p style={{ fontFamily: "var(--font-body)", fontSize: "1rem", color: "rgba(255,255,255,0.6)", lineHeight: 1.65, marginBottom: "36px" }}>
-            Join 25,000+ who get early access to new products and honest updates.
-          </p>
-          <NewsletterForm />
+      {/* ── MARQUEE TRUST STRIP ── */}
+      <section style={{ background: "var(--accent)", overflow: "hidden", padding: "16px 0" }}>
+        <div className="marquee-track" style={{ display: "flex", gap: "0", width: "max-content" }}>
+          {[
+            "Own Every Room",
+            "Made in India",
+            "Clean cuts · Real results",
+            "Trusted by 25,000+ customers",
+            "Free delivery above ₹599",
+            "30-day returns",
+            "Own Every Room",
+            "Made in India",
+            "Clean cuts · Real results",
+            "Trusted by 25,000+ customers",
+            "Free delivery above ₹599",
+            "30-day returns",
+          ].map((item, i) => (
+            <span key={i} style={{
+              fontFamily: "var(--font-body)",
+              fontSize: "0.75rem",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.14em",
+              color: "#0E0C14",
+              padding: "0 40px",
+              whiteSpace: "nowrap",
+              display: "flex",
+              alignItems: "center",
+              gap: "16px",
+            }}>
+              {item}
+              <span style={{ display: "inline-block", width: "4px", height: "4px", borderRadius: "50%", background: "#0E0C14", opacity: 0.5 }} />
+            </span>
+          ))}
         </div>
       </section>
 
       <Footer />
-
-      {/* ── QUICK VIEW MODAL ── */}
-      {quickView && (
-        <div
-          onClick={() => setQuickView(null)}
-          style={{
-            position: "fixed", inset: 0, background: "rgba(30,28,24,0.6)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px",
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: "var(--bg)", borderRadius: "var(--radius-lg)", maxWidth: "880px", width: "100%", overflow: "hidden", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))", boxShadow: "var(--shadow-xl)", maxHeight: "90vh", overflowY: "auto",
-            }}
-          >
-            {/* Image */}
-            <div style={{ background: "var(--bg)", overflow: "hidden" }}>
-              <img src={quickView.img} alt={quickView.name} style={{ width: "100%", aspectRatio: "4/5", objectFit: "cover", display: "block" }} />
-            </div>
-            {/* Info */}
-            <div style={{ padding: "clamp(24px,4vw,40px)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-              <button
-                onClick={() => setQuickView(null)}
-                style={{ alignSelf: "flex-end", background: "none", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: "1.5rem", lineHeight: 1, marginBottom: "24px", padding: "4px" }}
-                aria-label="Close quick view"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-              <p style={{ fontFamily: "var(--font-body)", fontSize: "0.75rem", color: "var(--muted)", marginBottom: "6px" }}>{quickView.description}</p>
-              <h2 style={{ fontFamily: "var(--font-heading)", fontSize: "clamp(1.5rem,3vw,2.2rem)", fontWeight: 700, color: "var(--text)", letterSpacing: "-0.02em", lineHeight: 1.15, marginBottom: "16px" }}>{quickView.name}</h2>
-              <p style={{ fontFamily: "var(--font-body)", fontSize: "1.25rem", fontWeight: 700, color: "var(--accent)", marginBottom: "32px" }}>₹{quickView.price.toLocaleString("en-IN")}</p>
-              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                <button
-                  onClick={() => { handleAddToCart(quickView); }}
-                  style={{
-                    flex: "1", minWidth: "140px", height: "52px", borderRadius: "var(--radius-sm)", border: "none", background: addedIds[quickView.id] ? "var(--primary)" : "var(--accent)", color: "#fff", fontFamily: "var(--font-body)", fontSize: "0.9375rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "background 0.18s ease, transform 0.15s ease",
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.02)")}
-                  onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
-                >
-                  {addedIds[quickView.id] ? "Added ✓" : "Add to Bag"}
-                </button>
-                <button
-                  onClick={() => { setQuickView(null); handleCardClick(quickView); }}
-                  style={{
-                    flex: "1", minWidth: "120px", height: "52px", borderRadius: "var(--radius-sm)", border: "2px solid var(--primary)", background: "transparent", color: "var(--text)", fontFamily: "var(--font-body)", fontSize: "0.9375rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "background 0.18s ease, transform 0.15s ease",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = "var(--primary)"; e.currentTarget.style.color = "#fff"; e.currentTarget.style.transform = "scale(1.02)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--text)"; e.currentTarget.style.transform = "scale(1)"; }}
-                >
-                  View Details
-                </button>
-              </div>
-              <p style={{ fontFamily: "var(--font-body)", fontSize: "0.8125rem", color: "var(--muted)", marginTop: "20px" }}>Free delivery above ₹599 · 30-day returns</p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
-  );
-}
-
-function NewsletterForm() {
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "done">("idle");
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || status !== "idle") return;
-    setStatus("loading");
-    try {
-      await fetch("/api/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-    } catch {}
-    setStatus("done");
-    setEmail("");
-  };
-
-  if (status === "done") {
-    return (
-      <div style={{ padding: "20px", background: "rgba(255,255,255,0.08)", borderRadius: "var(--radius-md)", color: "#fff", fontFamily: "var(--font-body)", fontSize: "1rem", fontWeight: 500 }}>
-        You're in. We'll be in touch soon. 👋
-      </div>
-    );
-  }
-
-  return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
-      <input
-        type="email"
-        value={email}
-        onChange={e => setEmail(e.target.value)}
-        placeholder="your@email.com"
-        required
-        style={{
-          flex: "1 1 220px",
-          height: "52px",
-          padding: "0 18px",
-          borderRadius: "var(--radius-sm)",
-          border: "1px solid rgba(255,255,255,0.3)",
-          background: "rgba(255,255,255,0.08)",
-          color: "#fff",
-          fontFamily: "var(--font-body)",
-          fontSize: "0.9375rem",
-          outline: "none",
-          boxSizing: "border-box",
-        }}
-      />
-      <button
-        type="submit"
-        disabled={status === "loading"}
-        style={{
-          height: "52px",
-          padding: "0 28px",
-          borderRadius: "var(--radius-sm)",
-          border: "none",
-          background: "var(--accent)",
-          color: "#fff",
-          fontFamily: "var(--font-body)",
-          fontSize: "0.9375rem",
-          fontWeight: 600,
-          cursor: "pointer",
-          whiteSpace: "nowrap",
-          transition: "transform 0.15s ease",
-        }}
-        onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.02)")}
-        onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
-      >
-        {status === "loading" ? "..." : "Subscribe"}
-      </button>
-    </form>
   );
 }
